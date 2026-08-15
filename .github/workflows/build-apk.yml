@@ -26,55 +26,36 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Auto-Detect Project Root & Build APK
+      - name: Unpack drivedrop.zip and Prepare Code
         run: |
-          # 1. Locate directory containing App.tsx
-          APP_PATH=$(find . -name "App.tsx" ! -path "*/node_modules/*" | head -n 1)
-          if [ -z "$APP_PATH" ]; then
-            echo "ERROR: App.tsx not found in repository."
-            find . -maxdepth 3
-            exit 1
+          # Automatically unzip drivedrop.zip if present
+          if [ -f "drivedrop.zip" ]; then
+            echo "Found drivedrop.zip! Unpacking..."
+            unzip -o drivedrop.zip
           fi
-          
-          # Get the folder that contains src/ (or contains App.tsx)
-          SRC_DIR=$(dirname "$APP_PATH")
-          if [ "$(basename "$SRC_DIR")" = "src" ]; then
-            ROOT_DIR=$(dirname "$SRC_DIR")
+
+          # If files were extracted into a nested folder, copy them to root
+          if [ -d "src" ]; then
+            echo "src directory is ready!"
           else
-            ROOT_DIR="$SRC_DIR"
+            NESTED_SRC=$(find . -maxdepth 3 -type d -name "src" ! -path "./src" | head -n 1)
+            if [ -n "$NESTED_SRC" ]; then
+              echo "Found nested src in $NESTED_SRC, moving to root"
+              NESTED_DIR=$(dirname "$NESTED_SRC")
+              cp -r "$NESTED_DIR"/* . || true
+            fi
           fi
 
-          echo "Detected project root at: $ROOT_DIR"
-          cd "$ROOT_DIR"
+          ls -la
+          ls -la src || true
 
-          # 2. Ensure src folder exists properly
-          mkdir -p src
-          if [ -f "App.tsx" ]; then mv App.tsx src/; fi
-          if [ -f "types.ts" ]; then mv types.ts src/; fi
-          if [ -f "main.tsx" ]; then mv main.tsx src/; fi
-          if [ -f "index.css" ]; then mv index.css src/; fi
-          if [ -d "components" ] && [ ! -d "src/components" ]; then mv components src/; fi
-          if [ -d "data" ] && [ ! -d "src/data" ]; then mv data src/; fi
-
-          # 3. Ensure valid main.tsx exists
-          cat << 'EOF' > src/main.tsx
-          import { StrictMode } from 'react';
-          import { createRoot } from 'react-dom/client';
-          import App from './App.tsx';
-          import './index.css';
-
-          createRoot(document.getElementById('root')!).render(
-            <StrictMode>
-              <App />
-            </StrictMode>
-          );
-          EOF
-
-          # 4. Install dependencies & build web app
+      - name: Build Web Application
+        run: |
           npm install
           npm run build
 
-          # 5. Build Android Native APK via Capacitor
+      - name: Compile Native Android APK
+        run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
           npx cap init DriveDrop com.drivedrop.app --web-dir dist
           npx cap add android
