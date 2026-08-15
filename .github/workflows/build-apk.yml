@@ -9,10 +9,10 @@ jobs:
   build-apk:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -26,33 +26,49 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Verify and Align Project Structure
+      - name: Auto-Repair Project Tree
         run: |
-          # Ensure src directory exists and files are placed properly
           mkdir -p src
-          if [ -f "main.tsx" ] && [ ! -f "src/main.tsx" ]; then
-            mv main.tsx src/
-          fi
-          if [ -f "App.tsx" ] && [ ! -f "src/App.tsx" ]; then
-            mv App.tsx src/
-          fi
-          if [ -f "index.css" ] && [ ! -f "src/index.css" ]; then
-            mv index.css src/
-          fi
-          if [ -f "types.ts" ] && [ ! -f "src/types.ts" ]; then
-            mv types.ts src/
+          
+          # Find main.tsx wherever it was uploaded and move to src/main.tsx
+          MAIN_FILE=$(find . -name "main.tsx" ! -path "*/node_modules/*" | head -n 1)
+          if [ -n "$MAIN_FILE" ] && [ "$MAIN_FILE" != "./src/main.tsx" ]; then
+            echo "Found main.tsx at $MAIN_FILE, moving to src/main.tsx"
+            mv "$MAIN_FILE" src/main.tsx
           fi
 
-          echo "Repository structure verified."
-          ls -la
-          ls -la src || true
+          # If main.tsx still does not exist, recreate the standard entry point
+          if [ ! -f "src/main.tsx" ]; then
+            echo "Creating standard src/main.tsx entry point"
+            cat << 'EOF' > src/main.tsx
+          import { StrictMode } from 'react';
+          import { createRoot } from 'react-dom/client';
+          import App from './App';
+          import './index.css';
 
-      - name: Build Web Application
+          createRoot(document.getElementById('root')!).render(
+            <StrictMode>
+              <App />
+            </StrictMode>
+          );
+          EOF
+          fi
+
+          # If index.css does not exist, ensure it exists
+          if [ ! -f "src/index.css" ]; then
+            echo '@import "tailwindcss";' > src/index.css
+          fi
+
+          # Move App.tsx and types.ts if they are in root
+          if [ -f "App.tsx" ]; then mv App.tsx src/; fi
+          if [ -f "types.ts" ]; then mv types.ts src/; fi
+
+      - name: Build Web Bundle
         run: |
           npm install
           npm run build
 
-      - name: Build Android Native APK
+      - name: Compile Native Android APK
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
           npx cap init DriveDrop com.drivedrop.app --web-dir dist
@@ -63,8 +79,8 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
 
-      - name: Upload Android APK
+      - name: Upload APK File
         uses: actions/upload-artifact@v4
         with:
           name: DriveDrop-app-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: '**/android/app/build/outputs/apk/debug/*.apk'
