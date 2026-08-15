@@ -26,21 +26,17 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Locate App Folder & Build APK
+      - name: Build Web Application
         run: |
-          PKG_PATH=$(find . -maxdepth 3 -name "package.json" ! -path "*/node_modules/*" | head -n 1)
-          APP_DIR=$(dirname "$PKG_PATH")
-          echo "Building in: $APP_DIR"
-          cd "$APP_DIR"
-
           npm install
           npm run build
 
+      - name: Build Android Native APK
+        run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
           npx cap init DriveDrop com.drivedrop.app --web-dir dist
           npx cap add android
           npx cap sync android
-          
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
@@ -49,4 +45,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: DriveDrop-app-debug
-          path: '**/android/app/build/outputs/apk/debug/*.apk'
+          path: android/app/build/outputs/apk/debug/app-debug.apk
