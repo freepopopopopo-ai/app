@@ -9,10 +9,10 @@ jobs:
   build-apk:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -26,6 +26,27 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Verify and Align Project Structure
+        run: |
+          # Ensure src directory exists and files are placed properly
+          mkdir -p src
+          if [ -f "main.tsx" ] && [ ! -f "src/main.tsx" ]; then
+            mv main.tsx src/
+          fi
+          if [ -f "App.tsx" ] && [ ! -f "src/App.tsx" ]; then
+            mv App.tsx src/
+          fi
+          if [ -f "index.css" ] && [ ! -f "src/index.css" ]; then
+            mv index.css src/
+          fi
+          if [ -f "types.ts" ] && [ ! -f "src/types.ts" ]; then
+            mv types.ts src/
+          fi
+
+          echo "Repository structure verified."
+          ls -la
+          ls -la src || true
+
       - name: Build Web Application
         run: |
           npm install
@@ -37,6 +58,7 @@ jobs:
           npx cap init DriveDrop com.drivedrop.app --web-dir dist
           npx cap add android
           npx cap sync android
+          
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
