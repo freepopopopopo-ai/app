@@ -17,40 +17,29 @@ jobs:
         with:
           node-version: 20
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21 (Required for Capacitor Android)
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Unpack drivedrop.zip and Prepare Code
+      - name: Unpack Code & Build Web App
         run: |
-          # Automatically unzip drivedrop.zip if present
           if [ -f "drivedrop.zip" ]; then
-            echo "Found drivedrop.zip! Unpacking..."
             unzip -o drivedrop.zip
           fi
 
-          # If files were extracted into a nested folder, copy them to root
-          if [ -d "src" ]; then
-            echo "src directory is ready!"
-          else
+          if [ ! -d "src" ]; then
             NESTED_SRC=$(find . -maxdepth 3 -type d -name "src" ! -path "./src" | head -n 1)
             if [ -n "$NESTED_SRC" ]; then
-              echo "Found nested src in $NESTED_SRC, moving to root"
               NESTED_DIR=$(dirname "$NESTED_SRC")
               cp -r "$NESTED_DIR"/* . || true
             fi
           fi
 
-          ls -la
-          ls -la src || true
-
-      - name: Build Web Application
-        run: |
           npm install
           npm run build
 
@@ -58,7 +47,7 @@ jobs:
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
           npx cap init DriveDrop com.drivedrop.app --web-dir dist
-          npx cap add android
+          npx cap add android || true
           npx cap sync android
           
           cd android
