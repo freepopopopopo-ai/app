@@ -1,18 +1,22 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import express from 'express';
 import path from 'path';
 import { defineConfig, Plugin } from 'vite';
-import { apiRouter } from './src/backend/apiRoutes';
 
 function apiMiddlewarePlugin(): Plugin {
   return {
     name: 'api-server-middleware',
-    configureServer(server) {
-      const app = express();
-      app.use(express.json());
-      app.use('/api', apiRouter);
-      server.middlewares.use(app);
+    async configureServer(server) {
+      try {
+        const express = (await import('express')).default;
+        const { apiRouter } = await import('./src/backend/apiRoutes.js');
+        const app = express();
+        app.use(express.json());
+        app.use('/api', apiRouter);
+        server.middlewares.use(app);
+      } catch (e) {
+        console.warn('API middleware skipped in standalone build mode');
+      }
     },
   };
 }
