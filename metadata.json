@@ -1,0 +1,6 @@
+{
+  "name": "DriveDrop",
+  "description": "DriveDrop Native Android App & Google Cloud Run Backend: Stream-transfers direct file URLs directly to Google Drive in the cloud without passing heavy file payloads through the mobile device.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
