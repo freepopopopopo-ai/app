@@ -26,48 +26,41 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Auto-Assemble Complete Source Tree
+      - name: Auto-Detect Project Root & Build APK
         run: |
+          # 1. Locate directory containing App.tsx
+          APP_PATH=$(find . -name "App.tsx" ! -path "*/node_modules/*" | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: App.tsx not found in repository."
+            find . -maxdepth 3
+            exit 1
+          fi
+          
+          # Get the folder that contains src/ (or contains App.tsx)
+          SRC_DIR=$(dirname "$APP_PATH")
+          if [ "$(basename "$SRC_DIR")" = "src" ]; then
+            ROOT_DIR=$(dirname "$SRC_DIR")
+          else
+            ROOT_DIR="$SRC_DIR"
+          fi
+
+          echo "Detected project root at: $ROOT_DIR"
+          cd "$ROOT_DIR"
+
+          # 2. Ensure src folder exists properly
           mkdir -p src
+          if [ -f "App.tsx" ]; then mv App.tsx src/; fi
+          if [ -f "types.ts" ]; then mv types.ts src/; fi
+          if [ -f "main.tsx" ]; then mv main.tsx src/; fi
+          if [ -f "index.css" ]; then mv index.css src/; fi
+          if [ -d "components" ] && [ ! -d "src/components" ]; then mv components src/; fi
+          if [ -d "data" ] && [ ! -d "src/data" ]; then mv data src/; fi
 
-          # 1. Locate and consolidate all components & data directories
-          COMPONENTS_DIR=$(find . -type d -name "components" ! -path "*/node_modules/*" | head -n 1)
-          if [ -n "$COMPONENTS_DIR" ] && [ "$COMPONENTS_DIR" != "./src/components" ]; then
-            cp -r "$COMPONENTS_DIR" src/
-          fi
-
-          DATA_DIR=$(find . -type d -name "data" ! -path "*/node_modules/*" | head -n 1)
-          if [ -n "$DATA_DIR" ] && [ "$DATA_DIR" != "./src/data" ]; then
-            cp -r "$DATA_DIR" src/
-          fi
-
-          BACKEND_DIR=$(find . -type d -name "backend" ! -path "*/node_modules/*" | head -n 1)
-          if [ -n "$BACKEND_DIR" ] && [ "$BACKEND_DIR" != "./src/backend" ]; then
-            cp -r "$BACKEND_DIR" src/
-          fi
-
-          # 2. Locate and move App.tsx, types.ts, main.tsx, index.css
-          APP_FILE=$(find . -name "App.tsx" ! -path "*/node_modules/*" | head -n 1)
-          if [ -n "$APP_FILE" ] && [ "$APP_FILE" != "./src/App.tsx" ]; then
-            cp "$APP_FILE" src/App.tsx
-          fi
-
-          TYPES_FILE=$(find . -name "types.ts" ! -path "*/node_modules/*" | head -n 1)
-          if [ -n "$TYPES_FILE" ] && [ "$TYPES_FILE" != "./src/types.ts" ]; then
-            cp "$TYPES_FILE" src/types.ts
-          fi
-
-          MAIN_FILE=$(find . -name "main.tsx" ! -path "*/node_modules/*" | head -n 1)
-          if [ -n "$MAIN_FILE" ] && [ "$MAIN_FILE" != "./src/main.tsx" ]; then
-            cp "$MAIN_FILE" src/main.tsx
-          fi
-
-          # Ensure main.tsx and index.css exist
-          if [ ! -f "src/main.tsx" ]; then
-            cat << 'EOF' > src/main.tsx
+          # 3. Ensure valid main.tsx exists
+          cat << 'EOF' > src/main.tsx
           import { StrictMode } from 'react';
           import { createRoot } from 'react-dom/client';
-          import App from './App';
+          import App from './App.tsx';
           import './index.css';
 
           createRoot(document.getElementById('root')!).render(
@@ -76,22 +69,12 @@ jobs:
             </StrictMode>
           );
           EOF
-          fi
 
-          if [ ! -f "src/index.css" ]; then
-            echo '@import "tailwindcss";' > src/index.css
-          fi
-
-          echo "=== Source Tree Ready ==="
-          ls -la src/
-
-      - name: Build Web Application
-        run: |
+          # 4. Install dependencies & build web app
           npm install
           npm run build
 
-      - name: Compile Native Android APK
-        run: |
+          # 5. Build Android Native APK via Capacitor
           npm install @capacitor/core @capacitor/cli @capacitor/android
           npx cap init DriveDrop com.drivedrop.app --web-dir dist
           npx cap add android
