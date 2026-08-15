@@ -26,17 +26,28 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install dependencies & Build Web App
+      - name: Locate App Folder & Build APK
         run: |
+          # Automatically find where package.json is located in the repository
+          PKG_PATH=$(find . -maxdepth 3 -name "package.json" ! -path "*/node_modules/*" | head -n 1)
+          if [ -z "$PKG_PATH" ]; then
+            echo "ERROR: package.json could not be found anywhere in the repository."
+            exit 1
+          fi
+          APP_DIR=$(dirname "$PKG_PATH")
+          echo "Found project directory at: $APP_DIR"
+          cd "$APP_DIR"
+
+          # Install packages & build web app
           npm install
           npm run build
 
-      - name: Initialize & Build Android Native Project
-        run: |
+          # Setup Capacitor Android project & compile APK
           npm install @capacitor/core @capacitor/cli @capacitor/android
           npx cap init DriveDrop com.drivedrop.app --web-dir dist
           npx cap add android
           npx cap sync android
+          
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
@@ -45,4 +56,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: DriveDrop-app-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: '**/android/app/build/outputs/apk/debug/*.apk'
