@@ -26,20 +26,44 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Auto-Repair Project Tree
+      - name: Auto-Assemble Complete Source Tree
         run: |
           mkdir -p src
-          
-          # Find main.tsx wherever it was uploaded and move to src/main.tsx
-          MAIN_FILE=$(find . -name "main.tsx" ! -path "*/node_modules/*" | head -n 1)
-          if [ -n "$MAIN_FILE" ] && [ "$MAIN_FILE" != "./src/main.tsx" ]; then
-            echo "Found main.tsx at $MAIN_FILE, moving to src/main.tsx"
-            mv "$MAIN_FILE" src/main.tsx
+
+          # 1. Locate and consolidate all components & data directories
+          COMPONENTS_DIR=$(find . -type d -name "components" ! -path "*/node_modules/*" | head -n 1)
+          if [ -n "$COMPONENTS_DIR" ] && [ "$COMPONENTS_DIR" != "./src/components" ]; then
+            cp -r "$COMPONENTS_DIR" src/
           fi
 
-          # If main.tsx still does not exist, recreate the standard entry point
+          DATA_DIR=$(find . -type d -name "data" ! -path "*/node_modules/*" | head -n 1)
+          if [ -n "$DATA_DIR" ] && [ "$DATA_DIR" != "./src/data" ]; then
+            cp -r "$DATA_DIR" src/
+          fi
+
+          BACKEND_DIR=$(find . -type d -name "backend" ! -path "*/node_modules/*" | head -n 1)
+          if [ -n "$BACKEND_DIR" ] && [ "$BACKEND_DIR" != "./src/backend" ]; then
+            cp -r "$BACKEND_DIR" src/
+          fi
+
+          # 2. Locate and move App.tsx, types.ts, main.tsx, index.css
+          APP_FILE=$(find . -name "App.tsx" ! -path "*/node_modules/*" | head -n 1)
+          if [ -n "$APP_FILE" ] && [ "$APP_FILE" != "./src/App.tsx" ]; then
+            cp "$APP_FILE" src/App.tsx
+          fi
+
+          TYPES_FILE=$(find . -name "types.ts" ! -path "*/node_modules/*" | head -n 1)
+          if [ -n "$TYPES_FILE" ] && [ "$TYPES_FILE" != "./src/types.ts" ]; then
+            cp "$TYPES_FILE" src/types.ts
+          fi
+
+          MAIN_FILE=$(find . -name "main.tsx" ! -path "*/node_modules/*" | head -n 1)
+          if [ -n "$MAIN_FILE" ] && [ "$MAIN_FILE" != "./src/main.tsx" ]; then
+            cp "$MAIN_FILE" src/main.tsx
+          fi
+
+          # Ensure main.tsx and index.css exist
           if [ ! -f "src/main.tsx" ]; then
-            echo "Creating standard src/main.tsx entry point"
             cat << 'EOF' > src/main.tsx
           import { StrictMode } from 'react';
           import { createRoot } from 'react-dom/client';
@@ -54,16 +78,14 @@ jobs:
           EOF
           fi
 
-          # If index.css does not exist, ensure it exists
           if [ ! -f "src/index.css" ]; then
             echo '@import "tailwindcss";' > src/index.css
           fi
 
-          # Move App.tsx and types.ts if they are in root
-          if [ -f "App.tsx" ]; then mv App.tsx src/; fi
-          if [ -f "types.ts" ]; then mv types.ts src/; fi
+          echo "=== Source Tree Ready ==="
+          ls -la src/
 
-      - name: Build Web Bundle
+      - name: Build Web Application
         run: |
           npm install
           npm run build
@@ -79,7 +101,7 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
 
-      - name: Upload APK File
+      - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: DriveDrop-app-debug
