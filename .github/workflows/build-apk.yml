@@ -26,11 +26,19 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Build Android APK
-        run: gradle assembleDebug --stacktrace
+      - name: Locate Project Root & Build APK
+        run: |
+          # Check where settings.gradle.kts or build.gradle.kts lives
+          GRADLE_ROOT=$(find . -name "settings.gradle.kts" -o -name "settings.gradle" | head -n 1 | xargs -I {} dirname {})
+          if [ -z "$GRADLE_ROOT" ]; then
+            GRADLE_ROOT="."
+          fi
+          echo "Building in directory: $GRADLE_ROOT"
+          cd "$GRADLE_ROOT"
+          gradle assembleDebug --stacktrace
 
       - name: Upload APK File
         uses: actions/upload-artifact@v4
         with:
           name: DriveDrop-app-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: '**/build/outputs/apk/debug/*.apk'
